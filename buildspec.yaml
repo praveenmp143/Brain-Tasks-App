@@ -1,7 +1,4 @@
 version: 0.2
-
-# Define environment variables needed for the build process
-# These should be set in the CodeBuild project configuration
 env:
   variables:
     # Example: ECR_REPOSITORY_URI: 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-eks-app
@@ -38,8 +35,6 @@ phases:
       # This command replaces the placeholder image tag with the fully qualified ECR URI.
       - sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" deployment.yaml
       - echo Updated deployment.yaml with new image URI: $IMAGE_URI
-      
-      # 2. Add the Kubernetes namespace to the appspec.yml
       - sed -i "s|NAMESPACE_PLACEHOLDER|$K8S_NAMESPACE|g" appspec.yml
       - echo Updated appspec.yml with namespace: $K8S_NAMESPACE
 
