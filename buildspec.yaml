@@ -1,0 +1,51 @@
+version: 0.2
+
+# Define environment variables needed for the build process
+# These should be set in the CodeBuild project configuration
+env:
+  variables:
+    # Example: ECR_REPOSITORY_URI: 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-eks-app
+    # Example: IMAGE_TAG: latest
+    # Example: K8S_NAMESPACE: my-app-namespace
+    K8S_NAMESPACE: default # Default Kubernetes namespace if not specified
+
+phases:
+  # Pre-Build Phase: Authenticate Docker client with ECR
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - IMAGE_URI=$ECR_REPOSITORY_URI:$IMAGE_TAG
+      - echo Image URI is $IMAGE_URI
+
+  # Build Phase: Build the Docker image and push it to ECR
+  build:
+    commands:
+      - echo Building the Docker image...
+      # Build the image using the IMAGE_URI environment variable
+      - docker build -t $IMAGE_URI .
+      - echo Tagging the image...
+      - docker tag $IMAGE_URI $ECR_REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - echo Pushing the Docker image to ECR...
+      - docker push $ECR_REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - docker push $IMAGE_URI
+
+  # Post-Build Phase: Prepare artifacts for CodeDeploy
+  post_build:
+    commands:
+      - echo Creating deployment artifacts...
+      # 1. Update the Kubernetes deployment manifest (deployment.yaml) with the new image tag.
+      # This command replaces the placeholder image tag with the fully qualified ECR URI.
+      - sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" deployment.yaml
+      - echo Updated deployment.yaml with new image URI: $IMAGE_URI
+      
+      # 2. Add the Kubernetes namespace to the appspec.yml
+      - sed -i "s|NAMESPACE_PLACEHOLDER|$K8S_NAMESPACE|g" appspec.yml
+      - echo Updated appspec.yml with namespace: $K8S_NAMESPACE
+
+artifacts:
+  files:
+    # These files are passed to CodeDeploy for deployment
+    - appspec.yml
+    - deployment.yaml
+  discard-paths: yes
