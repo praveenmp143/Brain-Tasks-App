@@ -23,7 +23,6 @@ phases:
       # Build and tag the image using the short commit hash as a secondary tag
       - docker build -t $IMAGE_URI .
       - docker tag $IMAGE_URI $ECR_REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
-      
       - echo "Pushing the Docker images to ECR..."
       - docker push $ECR_REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
       - docker push $IMAGE_URI
@@ -32,15 +31,10 @@ phases:
   post_build:
     commands:
       - echo "Creating deployment artifacts..."
-      
       # Command 1: Update the Kubernetes deployment manifest with the new image tag.
-      # This command replaces the IMAGE_PLACEHOLDER in deployment.yaml.
       - sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" deployment.yaml
       - echo "Updated deployment.yaml with new image URI: $IMAGE_URI"
-      
       # Command 2: Add the Kubernetes namespace to the appspec.yml
-      # This command replaces the NAMESPACE_PLACEHOLDER in appspec.yml.
-      # This is likely where the previous error (line 37) occurred due to indentation.
       - sed -i "s|NAMESPACE_PLACEHOLDER|$K8S_NAMESPACE|g" appspec.yml
       - echo "Updated appspec.yml with namespace: $K8S_NAMESPACE"
 
