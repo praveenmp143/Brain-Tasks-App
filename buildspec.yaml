@@ -1,46 +1,53 @@
 version: 0.2
+
+# Configuration Note: Ensure AWS_ACCOUNT_ID, ECR_REPOSITORY_URI, and IMAGE_TAG 
+# are set as environment variables in your CodeBuild project settings.
 env:
   variables:
-    # Example: ECR_REPOSITORY_URI: 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-eks-app
-    # Example: IMAGE_TAG: latest
-    # Example: K8S_NAMESPACE: my-app-namespace
     K8S_NAMESPACE: default # Default Kubernetes namespace if not specified
 
 phases:
-  # Pre-Build Phase: Authenticate Docker client with ECR
+  # --- PRE-BUILD PHASE: ECR Login ---
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
+      - echo "Logging in to Amazon ECR..."
+      # Use the current CodeBuild region for ECR login
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - IMAGE_URI=$ECR_REPOSITORY_URI:$IMAGE_TAG
-      - echo Image URI is $IMAGE_URI
+      - echo "Image URI is $IMAGE_URI"
 
-  # Build Phase: Build the Docker image and push it to ECR
+  # --- BUILD PHASE: Build and Push Docker Image ---
   build:
     commands:
-      - echo Building the Docker image...
-      # Build the image using the IMAGE_URI environment variable
+      - echo "Building the Docker image..."
+      # Build and tag the image using the short commit hash as a secondary tag
       - docker build -t $IMAGE_URI .
-      - echo Tagging the image...
       - docker tag $IMAGE_URI $ECR_REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
-      - echo Pushing the Docker image to ECR...
+      
+      - echo "Pushing the Docker images to ECR..."
       - docker push $ECR_REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
       - docker push $IMAGE_URI
 
-  # Post-Build Phase: Prepare artifacts for CodeDeploy
+  # --- POST-BUILD PHASE: Prepare CodeDeploy Artifacts ---
   post_build:
     commands:
-      - echo Creating deployment artifacts...
-      # 1. Update the Kubernetes deployment manifest (deployment.yaml) with the new image tag.
-      # This command replaces the placeholder image tag with the fully qualified ECR URI.
+      - echo "Creating deployment artifacts..."
+      
+      # Command 1: Update the Kubernetes deployment manifest with the new image tag.
+      # This command replaces the IMAGE_PLACEHOLDER in deployment.yaml.
       - sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" deployment.yaml
-      - echo Updated deployment.yaml with new image URI: $IMAGE_URI
+      - echo "Updated deployment.yaml with new image URI: $IMAGE_URI"
+      
+      # Command 2: Add the Kubernetes namespace to the appspec.yml
+      # This command replaces the NAMESPACE_PLACEHOLDER in appspec.yml.
+      # This is likely where the previous error (line 37) occurred due to indentation.
       - sed -i "s|NAMESPACE_PLACEHOLDER|$K8S_NAMESPACE|g" appspec.yml
-      - echo Updated appspec.yml with namespace: $K8S_NAMESPACE
+      - echo "Updated appspec.yml with namespace: $K8S_NAMESPACE"
 
 artifacts:
   files:
-    # These files are passed to CodeDeploy for deployment
+    # Artifacts passed to CodeDeploy
     - appspec.yml
     - deployment.yaml
   discard-paths: yes
+
