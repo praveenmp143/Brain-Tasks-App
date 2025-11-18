@@ -4,10 +4,7 @@ phases:
   install:
     commands:
       - echo "Installing dependencies..."
-      # Detect OS and install packages
-      - if [ -f /etc/debian_version ]; then apt-get update -y && apt-get install -y jq awscli docker.io; fi
-      - if [ -f /etc/redhat-release ]; then yum install -y jq awscli docker; fi
-      - if [ -f /etc/al2023-release ]; then dnf install -y jq awscli docker; fi
+      - dnf install -y jq awscli docker
 
   pre_build:
     commands:
