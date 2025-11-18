@@ -4,7 +4,7 @@ version: 0.2
 phases:
   install:
     commands:
-      - yum install -y jq awscli curl
+      - apt-get install -y jq curl awscli
       - echo "Installing kubectl..."
       - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
       - chmod +x kubectl
