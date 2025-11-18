@@ -1,46 +1,21 @@
-# --- Deployment Resource ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-eks-app-deployment
+  name: mind-app
   labels:
-    app: my-eks-app
+    app: mind-app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: my-eks-app
+      app: mind-app
   template:
     metadata:
       labels:
-        app: my-eks-app
+        app: mind-app
     spec:
       containers:
-      - name: app-container
-        # This placeholder will be replaced by the full ECR path in the CodeBuild process
+      - name: mind-app
         image: IMAGE_PLACEHOLDER
         ports:
         - containerPort: 8080
-        resources:
-          limits:
-            memory: "128Mi"
-            cpu: "500m"
----
-# --- Service Resource (Optional, but often needed to expose the Deployment) ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-eks-app-service
-  labels:
-    app: my-eks-app
-spec:
-  # LoadBalancer type is used to expose the service publicly (requires AWS Load Balancer Controller)
-  # Use ClusterIP if you only need internal access
-  type: LoadBalancer 
-  selector:
-    app: my-eks-app # Selects the pods created by the Deployment
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 8080 # The port the container is listening on (8080 in the Deployment)
-
