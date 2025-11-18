@@ -20,18 +20,18 @@ phases:
       - REPOSITORY=devops-app
 
       - echo "Updating kubeconfig..."
-      - aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME
+      - aws eks update-kubeconfig --region $REGION --name $confused-folk-dinosaur
 
   build:
     commands:
       - echo "Updating manifest..."
-      - sed -i "s|IMAGE_PLACEHOLDER|$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG|g" eks/deployment.yaml
+      - sed -i "s|IMAGE_PLACEHOLDER|$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG|g" deployment.yaml
 
   post_build:
     commands:
       - echo "Applying manifests..."
-      - kubectl apply -f eks/deployment.yaml
-      - kubectl apply -f eks/service.yaml
+      - kubectl apply -f deployment.yaml
+      - kubectl apply -f service.yaml
       - echo "Deployment complete!"
 
 
