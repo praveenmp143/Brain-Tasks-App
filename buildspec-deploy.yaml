@@ -1,37 +1,34 @@
-
 version: 0.2
 
 phases:
   install:
     commands:
-      - yum install -y jq awscli curl --allowerasing
       - echo "Installing kubectl..."
       - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
       - chmod +x kubectl
       - mv kubectl /usr/local/bin/
+      - kubectl version --client
 
   pre_build:
     commands:
-      - echo "Setting vars..."
+      - echo "Loading variables..."
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REGION=us-east-1
       - CLUSTER_NAME=confused-folk-dinosaur
-      - IMAGE_TAG=$(cat imageTag.txt)
       - REPOSITORY=devops-app
+      - IMAGE_TAG=$(cat imageTag.txt)
 
       - echo "Updating kubeconfig..."
-      - aws eks update-kubeconfig --region $REGION --name $confused-folk-dinosaur
+      - aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME
 
   build:
     commands:
-      - echo "Updating manifest..."
-      - sed -i "s|IMAGE_PLACEHOLDER|$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG|g" deployment.yaml
+      - echo "Updating deployment manifest with new image..."
+      - sed -i "s|IMAGE_PLACEHOLDER|$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG|g" eks/deployment.yaml
 
   post_build:
     commands:
-      - echo "Applying manifests..."
-      - kubectl apply -f deployment.yaml
-      - kubectl apply -f service.yaml
-      - echo "Deployment complete!"
-
-
+      - echo "Applying Kubernetes manifests..."
+      - kubectl apply -f eks/deployment.yaml
+      - kubectl apply -f eks/service.yaml
+      - echo "Deployment completed successfully!"
