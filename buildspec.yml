@@ -3,6 +3,9 @@ version: 0.2
 phases:
   install:
     commands:
+      - echo "Installing dependencies..."
+      - yum install -y jq awscli docker
+      - service docker start || true
       - echo "Installing kubectl..."
       - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
       - chmod +x kubectl
@@ -11,24 +14,36 @@ phases:
 
   pre_build:
     commands:
-      - echo "Loading variables..."
+      - echo "Setting environment variables..."
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REGION=us-east-1
-      - CLUSTER_NAME=confused-folk-dinosaur
       - REPOSITORY=devops-app
-      - IMAGE_TAG=$(cat imageTag.txt)
-
+      - CLUSTER_NAME=confused-folk-dinosaur
+      - IMAGE_TAG=$(date +%Y%m%d%H%M)
+      - echo "Logging in to ECR..."
+      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
       - echo "Updating kubeconfig..."
       - aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME
 
   build:
     commands:
-      - echo "Updating deployment manifest with new image..."
-      - sed -i "s|IMAGE_PLACEHOLDER|$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG|g" eks/deployment.yaml
+      - echo "Building Docker image..."
+      - docker build -t $REPOSITORY .
+      - echo "Tagging image..."
+      - docker tag $REPOSITORY:latest $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG
+      - echo "Updating deployment manifest with image..."
+      - sed -i "s|IMAGE_PLACEHOLDER|$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG|g" deployment.yaml
 
   post_build:
     commands:
+      - echo "Pushing image to ECR..."
+      - docker push $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG
       - echo "Applying Kubernetes manifests..."
-      - kubectl apply -f eks/deployment.yaml
-      - kubectl apply -f eks/service.yaml
+      - kubectl apply -f deployment.yaml
+      - kubectl apply -f service.yaml
       - echo "Deployment completed successfully!"
+
+artifacts:
+  files:
+    - deployment.yaml
+    - service.yaml
