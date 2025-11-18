@@ -4,7 +4,9 @@ phases:
   install:
     commands:
       - echo "Installing dependencies..."
-      - yum install -y jq awscli docker
+      # Added --allowerasing to fix the curl conflict from your previous error
+      # and ensure docker/jq are installed correctly on Amazon Linux 2023
+      - yum install -y jq awscli docker --allowerasing
       - service docker start || true
       - echo "Installing kubectl..."
       - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -32,6 +34,7 @@ phases:
       - echo "Tagging image..."
       - docker tag $REPOSITORY:latest $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG
       - echo "Updating deployment manifest with image..."
+      # Ensure your deployment.yaml actually contains the text 'IMAGE_PLACEHOLDER'
       - sed -i "s|IMAGE_PLACEHOLDER|$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG|g" deployment.yaml
 
   post_build:
