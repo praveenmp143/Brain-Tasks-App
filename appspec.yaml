@@ -1,42 +1,21 @@
 version: 0.0
-# The compute platform MUST be set to "Kubernetes" for EKS deployments
-# The deployment group configuration must point to your EKS cluster and namespace.
-# Note: The K8S_NAMESPACE placeholder will be replaced by CodeBuild.
+os: linux
+files:
+  - source: /
+    destination: /var/www/mind-app
+hooks:
+  BeforeInstall:
+    - location: scripts/stop_server.sh
+      timeout: 90
 
-Resources:
-  -
-    TargetService:
-      Type: AWS::ECS::Service # Even though we are using EKS, the resource structure is generic for container services.
-      Properties:
-        # The EKS cluster name must be provided in the CodeDeploy Deployment Group configuration.
-        # The EKS namespace is defined here, which will be dynamically substituted.
-        # NAMESPACE_PLACEHOLDER will be replaced with the actual namespace (e.g., 'default' or 'my-app-namespace')
-        Namespace: NAMESPACE_PLACEHOLDER
-        
-        # Array of Kubernetes manifests (YAML/JSON) to apply
-        ApplicationManifest: deployment.yaml
-        
-        # Mandatory configuration to specify what CodeDeploy should monitor for health checks
-        # This points to the Deployment resource defined in deployment.yaml
-        ResourceSpec:
-          Type: K8S
-          Properties:
-            ResourceIdentifier:
-              # Type of resource (e.g., Deployment, Service, DaemonSet)
-              - key: "kind"
-                value: "Deployment"
-              # Name of the resource defined in deployment.yaml
-              - key: "name"
-                value: "my-eks-app-deployment"
+  AfterInstall:
+    - location: scripts/install_dependencies.sh
+      timeout: 300
 
-# CodeDeploy Deployment Lifecycle Hooks
-# These are optional but allow custom scripts (not shown here) to run on the cluster
-Hooks:
-  BeforeAllowTraffic:
-    - Location: scripts/pre_traffic_hook.sh
-      Timeout: 300
-      RunOrder: 1
-  AfterAllowTraffic:
-    - Location: scripts/post_traffic_hook.sh
-      Timeout: 300
-      RunOrder: 2
+  ApplicationStart:
+    - location: scripts/start_server.sh
+      timeout: 180
+
+  ValidateService:
+    - location: scripts/validate.sh
+      timeout: 30
