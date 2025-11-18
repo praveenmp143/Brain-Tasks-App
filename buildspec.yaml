@@ -1,46 +1,37 @@
+
 version: 0.2
 
-# Configuration Note: Ensure AWS_ACCOUNT_ID, ECR_REPOSITORY_URI, and IMAGE_TAG 
-# are set as environment variables in your CodeBuild project settings.
-env:
-  variables:
-    K8S_NAMESPACE: default # Default Kubernetes namespace if not specified
-
 phases:
-  # --- PRE-BUILD PHASE: ECR Login ---
+  install:
+    commands:
+      - yum install -y jq awscli curl
+      - echo "Installing kubectl..."
+      - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      - chmod +x kubectl
+      - mv kubectl /usr/local/bin/
+
   pre_build:
     commands:
-      - echo "Logging in to Amazon ECR..."
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - IMAGE_URI=$ECR_REPOSITORY_URI:Nginx:latest
-      - echo "Image URI is $IMAGE_URI"
+      - echo "Setting vars..."
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - REGION=us-east-1
+      - CLUSTER_NAME=confused-folk-dinosaur
+      - IMAGE_TAG=$(cat imageTag.txt)
+      - REPOSITORY=devops-app
 
-  # --- BUILD PHASE: Build and Push Docker Image ---
+      - echo "Updating kubeconfig..."
+      - aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME
+
   build:
     commands:
-      - echo "Building the Docker image..."
-      # Build and tag the image
-      - docker build -t $IMAGE_URI .
-      - docker tag $IMAGE_URI $ECR_REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
-      - echo "Pushing the Docker images to ECR..."
-      - docker push $ECR_REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
-      - docker push $IMAGE_URI
+      - echo "Updating manifest..."
+      - sed -i "s|IMAGE_PLACEHOLDER|$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY:$IMAGE_TAG|g" eks/deployment.yaml
 
-  # --- POST-BUILD PHASE: Prepare CodeDeploy Artifacts ---
   post_build:
     commands:
-      - echo "Creating deployment artifacts..."
-      # Update Kubernetes manifest with the dynamic image tag
-      - sed -i "s|IMAGE_PLACEHOLDER|$IMAGE_URI|g" deployment.yaml
-      - echo "Updated deployment.yaml with new image URI: $IMAGE_URI"
-      # Update appspec with the target Kubernetes namespace
-      - sed -i "s|NAMESPACE_PLACEHOLDER|$K8S_NAMESPACE|g" appspec.yml
-      - echo "Updated appspec.yml with namespace: $K8S_NAMESPACE"
+      - echo "Applying manifests..."
+      - kubectl apply -f eks/deployment.yaml
+      - kubectl apply -f eks/service.yaml
+      - echo "Deployment complete!"
 
-artifacts:
-  files:
-    # Artifacts passed to CodeDeploy
-    - appspec.yml
-    - deployment.yaml
-  discard-paths: yes
 
